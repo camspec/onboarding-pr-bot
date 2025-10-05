@@ -15,6 +15,8 @@ if TOKEN is None:
 client = discord.Client(intents=discord.Intents.default())
 tree = discord.app_commands.CommandTree(client)
 
+logger.add("bot.log")
+
 
 def init_db():
     try:
@@ -22,17 +24,17 @@ def init_db():
             cursor = conn.cursor()
             with open("schema.sql") as f:
                 cursor.executescript(f.read())
-            print(
+            logger.info(
                 f"Opened SQLite database with version {sqlite3.sqlite_version} successfully."
             )
     except sqlite3.Error as e:
-        print(f"Failed to open database: {e}")
+        logger.error(f"Failed to open database: {e}")
 
 
 @client.event
 async def on_ready():
     await tree.sync()
-    print(f"We have logged on as {client.user}")
+    logger.info(f"We have logged on as {client.user}")
 
 
 class PRSubmissionModal(Modal, title="Submit a PR"):
@@ -64,18 +66,19 @@ class PRSubmissionModal(Modal, title="Submit a PR"):
                     """INSERT INTO prs (user_id, name, pr_link, onboarding_type) VALUES (?, ?, ?, ?)""",
                     (user_id, name, pr_link, onboarding_type),
                 )
-
+            logger.info(
+                f"PR Submitted: user_id={user_id}, name={name}, pr_link={pr_link}, onboarding_type={onboarding_type}"
+            )
             await interaction.response.send_message(
                 f"Thanks for your response, {self.name.value}! A Software Lead will get back to you when your PR is reviewed.",
                 ephemeral=True,
             )
         except sqlite3.Error as e:
-            print(f"Failed to insert PR: {e}")
+            logger.error(f"Failed to insert PR: {e}")
             await interaction.response.send_message(
                 "Sorry, we failed to submit your PR due to a database error. Please let Cameron know he messed up.",
                 ephemeral=True,
             )
-        print(user_id, name, pr_link, onboarding_type)
 
 
 @tree.command(description="Submit an onboarding PR")
