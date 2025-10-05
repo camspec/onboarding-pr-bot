@@ -86,11 +86,6 @@ async def submit_onboarding(interaction: discord.Interaction):
     await interaction.response.send_modal(PRSubmissionModal())
 
 
-@tree.command(description="Checks bot latency")
-async def ping(interaction: discord.Interaction):
-    await interaction.response.send_message(f"Pong! Latency: {client.latency}")
-
-
 init_db()
 
 client.run(TOKEN)
