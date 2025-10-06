@@ -40,7 +40,9 @@ def is_software_lead(member: discord.Member):
 
 
 def get_unix_epoch(utc_string: str):
-    utc = datetime.strptime(utc_string, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+    utc = datetime.strptime(utc_string, "%Y-%m-%d %H:%M:%S").replace(
+        tzinfo=timezone.utc
+    )
     return int(utc.timestamp())
 
 
@@ -143,7 +145,7 @@ class PRQueueView(View):
 
         user_id, name, pr_link, onboarding_type, _ = self.selected_pr
         logger.info(
-                f"{interaction.user.name} reviewed PR: user_id={user_id}, name={name}, pr_link={pr_link}, onboarding_type={onboarding_type}"
+            f"{interaction.user.name} reviewed PR: user_id={user_id}, name={name}, pr_link={pr_link}, onboarding_type={onboarding_type}"
         )
         await interaction.response.send_message(
             "okay we reviewed this one", ephemeral=True
@@ -158,7 +160,7 @@ class PRQueueView(View):
 
         user_id, name, pr_link, onboarding_type, _ = self.selected_pr
         logger.info(
-                f"{interaction.user.name} requested changes for PR: user_id={user_id}, name={name}, pr_link={pr_link}, onboarding_type={onboarding_type}"
+            f"{interaction.user.name} requested changes for PR: user_id={user_id}, name={name}, pr_link={pr_link}, onboarding_type={onboarding_type}"
         )
         await interaction.response.send_message(
             "okay we requested changes for this one", ephemeral=True
