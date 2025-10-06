@@ -14,10 +14,22 @@ TOKEN = os.getenv("TOKEN")
 if TOKEN is None:
     raise ValueError("TOKEN is not set in .env")
 
-client = discord.Client(intents=discord.Intents.default())
+intents = discord.Intents.default()
+intents.members = True
+client = discord.Client(intents=intents)
 tree = discord.app_commands.CommandTree(client)
 
 logger.add("bot.log")
+
+
+@dataclass
+class PR:
+    pr_id: int
+    user_id: int
+    name: str
+    pr_link: str
+    onboarding_type: str
+    submitted_at: str
 
 
 def init_db():
@@ -47,6 +59,81 @@ def get_unix_epoch(utc_string: str):
     return int(utc.timestamp())
 
 
+def approve_pr(pr_id: int):
+    with sqlite3.connect("database.db") as conn:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE prs SET status = 'Approved' WHERE pr_id = ?", (pr_id,))
+
+
+def remove_pr(pr_id: int):
+    with sqlite3.connect("database.db") as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM prs WHERE pr_id = ?", (pr_id,))
+
+
+async def update_roles(interaction: discord.Interaction, pr: PR):
+    if interaction.guild:
+        print(interaction.guild.members)
+        member = interaction.guild.get_member(pr.user_id)
+        if not member:
+            logger.error(f"Couldn't find the user {pr.user_id} in the server.")
+            await interaction.response.send_message(
+                f"Sorry, we couldn't find the user <@{pr.user_id}> in the server. Please let Cameron know he messed up.",
+                ephemeral=True,
+            )
+            return False
+
+        software_role = discord.utils.find(
+            lambda r: r.name == "Software", interaction.guild.roles
+        )
+        firmware_role = discord.utils.find(
+            lambda r: r.name == "Firmware", interaction.guild.roles
+        )
+        gs_role = discord.utils.find(lambda r: r.name == "GS", interaction.guild.roles)
+        fw_onboarding_role = discord.utils.find(
+            lambda r: r.name == "FW-Onboarding", interaction.guild.roles
+        )
+        gs_onboarding_role = discord.utils.find(
+            lambda r: r.name == "GS-Onboarding", interaction.guild.roles
+        )
+        if not all(
+            [
+                software_role,
+                firmware_role,
+                gs_role,
+                fw_onboarding_role,
+                gs_onboarding_role,
+            ]
+        ):
+            logger.error("One or more required roles are missing in the server.")
+            await interaction.response.send_message(
+                "One or more required roles are missing in the server.", ephemeral=True
+            )
+            return False
+
+        assert software_role is not None
+        assert firmware_role is not None
+        assert gs_role is not None
+        assert fw_onboarding_role is not None
+        assert gs_onboarding_role is not None
+
+        try:
+            if pr.onboarding_type == "Firmware":
+                await member.remove_roles(fw_onboarding_role)
+                await member.add_roles(software_role, firmware_role)
+            else:
+                await member.remove_roles(gs_onboarding_role)
+                await member.add_roles(software_role, gs_role)
+        except discord.DiscordException as e:
+            logger.error(f"Failed to update roles for {pr.user_id}: {e}")
+            await interaction.response.send_message(
+                "Sorry, we failed to update roles. Please let Cameron know he messed up.",
+                ephemeral=True,
+            )
+
+        return True
+
+
 @client.event
 async def on_ready():
     await tree.sync()
@@ -54,16 +141,6 @@ async def on_ready():
         activity=discord.Activity(type=discord.ActivityType.listening, name="Weezer")
     )
     logger.info(f"We have logged on as {client.user}")
-
-
-@dataclass
-class PR:
-    pr_id: int
-    user_id: int
-    name: str
-    pr_link: str
-    onboarding_type: str
-    submitted_at: str
 
 
 class PRSubmissionModal(Modal, title="Submit a PR"):
@@ -162,6 +239,21 @@ class PRQueueView(View):
             )
             return
 
+        try:
+            approve_pr(self.selected_pr.pr_id)
+        except sqlite3.Error as e:
+            logger.error(f"Failed to approve PR: {e}")
+            await interaction.response.send_message(
+                "Sorry, we failed to approve the PR due to a database error. Please let Cameron know he messed up.",
+                ephemeral=True,
+            )
+            return
+
+        success = await update_roles(interaction, self.selected_pr)
+
+        if not success:
+            return
+
         logger.info(
             f"{interaction.user.name} ({interaction.user.id}) approved PR: "
             f"user_id={self.selected_pr.user_id}, "
@@ -180,6 +272,16 @@ class PRQueueView(View):
             )
             return
 
+        try:
+            remove_pr(self.selected_pr.pr_id)
+        except sqlite3.Error as e:
+            logger.error(f"Failed to remove PR: {e}")
+            await interaction.response.send_message(
+                "Sorry, we failed to remove the PR due to a database error. Please let Cameron know he messed up.",
+                ephemeral=True,
+            )
+            return
+
         logger.info(
             f"{interaction.user.name} ({interaction.user.id}) requested changes for PR: "
             f"user_id={self.selected_pr.user_id}, "
@@ -188,7 +290,8 @@ class PRQueueView(View):
             f"onboarding_type={self.selected_pr.onboarding_type}"
         )
         await interaction.response.send_message(
-            f"You requested changes for <@{self.selected_pr.user_id}>'s PR.", ephemeral=True
+            f"You requested changes for <@{self.selected_pr.user_id}>'s PR.",
+            ephemeral=True,
         )
 
 
