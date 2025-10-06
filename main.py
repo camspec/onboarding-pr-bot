@@ -71,7 +71,7 @@ def remove_pr(pr_id: int):
         cursor.execute("DELETE FROM prs WHERE pr_id = ?", (pr_id,))
 
 
-async def update_roles(interaction: discord.Interaction, pr: PR):
+async def update_roles(interaction: discord.Interaction, pr: PR) -> bool:
     if interaction.guild:
         print(interaction.guild.members)
         member = interaction.guild.get_member(pr.user_id)
@@ -130,8 +130,10 @@ async def update_roles(interaction: discord.Interaction, pr: PR):
                 "Sorry, we failed to update roles. Please let Cameron know he messed up.",
                 ephemeral=True,
             )
+            return False
 
         return True
+    return False
 
 
 @client.event
@@ -177,19 +179,20 @@ class PRSubmissionModal(Modal, title="Submit a PR"):
                     """INSERT INTO prs (user_id, name, pr_link, onboarding_type) VALUES (?, ?, ?, ?)""",
                     (user_id, name, pr_link, onboarding_type),
                 )
-            logger.info(
-                f"PR Submitted: user_id={user_id}, name={name}, pr_link={pr_link}, onboarding_type={onboarding_type}"
-            )
-            await interaction.response.send_message(
-                f"Thanks for your response, {self.name.value}! A Software Lead will get back to you when your PR is reviewed.",
-                ephemeral=True,
-            )
         except sqlite3.Error as e:
             logger.error(f"Failed to insert PR: {e}")
             await interaction.response.send_message(
                 "Sorry, we failed to submit your PR due to a database error. Please let Cameron know he messed up.",
                 ephemeral=True,
             )
+            return
+        logger.info(
+            f"PR Submitted: user_id={user_id}, name={name}, pr_link={pr_link}, onboarding_type={onboarding_type}"
+        )
+        await interaction.response.send_message(
+            f"Thanks for your response, {self.name.value}! A Software Lead will get back to you when your PR is reviewed.",
+            ephemeral=True,
+        )
 
 
 class PRQueueView(View):
