@@ -121,7 +121,7 @@ class PRQueueView(View):
         self.add_item(self.select)
 
         self.approve_button = Button(
-            label="Approved",
+            label="Approve",
             style=discord.ButtonStyle.green,
             disabled=not user_is_lead,
         )
