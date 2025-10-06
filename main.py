@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from datetime import datetime, timezone
 import os
 import sqlite3
@@ -49,7 +50,20 @@ def get_unix_epoch(utc_string: str):
 @client.event
 async def on_ready():
     await tree.sync()
+    await client.change_presence(
+        activity=discord.Activity(type=discord.ActivityType.listening, name="Weezer")
+    )
     logger.info(f"We have logged on as {client.user}")
+
+
+@dataclass
+class PR:
+    pr_id: int
+    user_id: int
+    name: str
+    pr_link: str
+    onboarding_type: str
+    submitted_at: str
 
 
 class PRSubmissionModal(Modal, title="Submit a PR"):
@@ -102,15 +116,15 @@ class PRSubmissionModal(Modal, title="Submit a PR"):
 
 
 class PRQueueView(View):
-    def __init__(self, prs: list, user_is_lead: bool):
+    def __init__(self, prs: list[PR], user_is_lead: bool):
         super().__init__()
         self.prs = prs
         self.selected_pr = None
 
         options = [
             discord.SelectOption(
-                label=f"{i + 1}. {pr[1]} ({pr[3]} {'⌨️' if pr[3] == 'Firmware' else '🌎'})",
-                description=pr[2],
+                label=f"{i + 1}. {pr.name} ({pr.onboarding_type} {'⌨️' if pr.onboarding_type == 'Firmware' else '🌎'})",
+                description=pr.pr_link,
                 value=str(i),
             )
             for i, pr in enumerate(prs)
@@ -148,12 +162,15 @@ class PRQueueView(View):
             )
             return
 
-        user_id, name, pr_link, onboarding_type, _ = self.selected_pr
         logger.info(
-            f"{interaction.user.name} ({interaction.user.id}) approved PR: user_id={user_id}, name={name}, pr_link={pr_link}, onboarding_type={onboarding_type}"
+            f"{interaction.user.name} ({interaction.user.id}) approved PR: "
+            f"user_id={self.selected_pr.user_id}, "
+            f"name={self.selected_pr.name}, "
+            f"pr_link={self.selected_pr.pr_link}, "
+            f"onboarding_type={self.selected_pr.onboarding_type}"
         )
         await interaction.response.send_message(
-            f"You approved <@{user_id}>'s PR.", ephemeral=True
+            f"You approved <@{self.selected_pr.user_id}>'s PR.", ephemeral=True
         )
 
     async def mark_request_changes(self, interaction: discord.Interaction):
@@ -163,12 +180,15 @@ class PRQueueView(View):
             )
             return
 
-        user_id, name, pr_link, onboarding_type, _ = self.selected_pr
         logger.info(
-            f"{interaction.user.name} ({interaction.user.id}) requested changes for PR: user_id={user_id}, name={name}, pr_link={pr_link}, onboarding_type={onboarding_type}"
+            f"{interaction.user.name} ({interaction.user.id}) requested changes for PR: "
+            f"user_id={self.selected_pr.user_id}, "
+            f"name={self.selected_pr.name}, "
+            f"pr_link={self.selected_pr.pr_link}, "
+            f"onboarding_type={self.selected_pr.onboarding_type}"
         )
         await interaction.response.send_message(
-            f"You requested changes for <@{user_id}>'s PR.", ephemeral=True
+            f"You requested changes for <@{self.selected_pr.user_id}>'s PR.", ephemeral=True
         )
 
 
@@ -194,9 +214,9 @@ async def view_onboarding_queue(interaction: discord.Interaction):
     with sqlite3.connect("database.db") as conn:
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT user_id, name, pr_link, onboarding_type, submitted_at FROM prs"
+            "SELECT pr_id, user_id, name, pr_link, onboarding_type, submitted_at FROM prs WHERE status = 'Pending'"
         )
-        prs = cursor.fetchall()
+        prs = [PR(*row) for row in cursor.fetchall()]
 
     if not prs:
         await interaction.response.send_message(
@@ -206,10 +226,9 @@ async def view_onboarding_queue(interaction: discord.Interaction):
 
     embed = discord.Embed(title="Onboarding PR Queue")
     for i, pr in enumerate(prs):
-        user_id, name, pr_link, onboarding_type, submitted_at = pr
         embed.add_field(
-            name=f"{i + 1}. {name} ({onboarding_type} {'⌨️' if onboarding_type == 'Firmware' else '🌎'})",
-            value=f"<@{user_id}>\nSubmitted at: <t:{get_unix_epoch(submitted_at)}:f>\n[View PR]({pr_link})",
+            name=f"{i + 1}. {pr.name} ({pr.onboarding_type} {'⌨️' if pr.onboarding_type == 'Firmware' else '🌎'})",
+            value=f"<@{pr.user_id}>\nSubmitted at: <t:{get_unix_epoch(pr.submitted_at)}:f>\n[View PR]({pr.pr_link})",
             inline=False,
         )
     await interaction.response.send_message(
