@@ -150,10 +150,10 @@ class PRQueueView(View):
 
         user_id, name, pr_link, onboarding_type, _ = self.selected_pr
         logger.info(
-            f"{interaction.user.name} reviewed PR: user_id={user_id}, name={name}, pr_link={pr_link}, onboarding_type={onboarding_type}"
+            f"{interaction.user.name} ({interaction.user.id}) reviewed PR: user_id={user_id}, name={name}, pr_link={pr_link}, onboarding_type={onboarding_type}"
         )
         await interaction.response.send_message(
-            "okay we reviewed this one", ephemeral=True
+            f"You reviewed <@{user_id}>'s PR.", ephemeral=True
         )
 
     async def mark_request_changes(self, interaction: discord.Interaction):
@@ -165,20 +165,26 @@ class PRQueueView(View):
 
         user_id, name, pr_link, onboarding_type, _ = self.selected_pr
         logger.info(
-            f"{interaction.user.name} requested changes for PR: user_id={user_id}, name={name}, pr_link={pr_link}, onboarding_type={onboarding_type}"
+            f"{interaction.user.name} ({interaction.user.id}) requested changes for PR: user_id={user_id}, name={name}, pr_link={pr_link}, onboarding_type={onboarding_type}"
         )
         await interaction.response.send_message(
-            "okay we requested changes for this one", ephemeral=True
+            f"You requested changes for <@{user_id}>'s PR.", ephemeral=True
         )
 
 
 @tree.command(description="Submit an onboarding PR")
 async def submit_onboarding(interaction: discord.Interaction):
+    logger.info(
+        f"User {interaction.user.name} ({interaction.user.id}) used /submit_onboarding"
+    )
     await interaction.response.send_modal(PRSubmissionModal())
 
 
 @tree.command(description="View the onboarding PR queue")
 async def view_onboarding_queue(interaction: discord.Interaction):
+    logger.info(
+        f"User {interaction.user.name} ({interaction.user.id}) used /view_onboarding_queue"
+    )
     if not isinstance(interaction.user, discord.Member):
         await interaction.response.send_message(
             "This command can only be used in a server.", ephemeral=True
