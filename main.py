@@ -120,8 +120,8 @@ class PRQueueView(View):
         self.select.callback = self.pr_selected
         self.add_item(self.select)
 
-        self.reviewed_button = Button(
-            label="Reviewed",
+        self.approve_button = Button(
+            label="Approved",
             style=discord.ButtonStyle.green,
             disabled=not user_is_lead,
         )
@@ -131,17 +131,17 @@ class PRQueueView(View):
             disabled=not user_is_lead,
         )
 
-        self.reviewed_button.callback = self.mark_reviewed
+        self.approve_button.callback = self.mark_approved
         self.request_changes_button.callback = self.mark_request_changes
 
-        self.add_item(self.reviewed_button)
+        self.add_item(self.approve_button)
         self.add_item(self.request_changes_button)
 
     async def pr_selected(self, interaction: discord.Interaction):
         self.selected_pr = self.prs[int(self.select.values[0])]
         await interaction.response.defer()
 
-    async def mark_reviewed(self, interaction: discord.Interaction):
+    async def mark_approved(self, interaction: discord.Interaction):
         if not self.selected_pr:
             await interaction.response.send_message(
                 "Please select a PR first!", ephemeral=True
@@ -150,10 +150,10 @@ class PRQueueView(View):
 
         user_id, name, pr_link, onboarding_type, _ = self.selected_pr
         logger.info(
-            f"{interaction.user.name} ({interaction.user.id}) reviewed PR: user_id={user_id}, name={name}, pr_link={pr_link}, onboarding_type={onboarding_type}"
+            f"{interaction.user.name} ({interaction.user.id}) approved PR: user_id={user_id}, name={name}, pr_link={pr_link}, onboarding_type={onboarding_type}"
         )
         await interaction.response.send_message(
-            f"You reviewed <@{user_id}>'s PR.", ephemeral=True
+            f"You approved <@{user_id}>'s PR.", ephemeral=True
         )
 
     async def mark_request_changes(self, interaction: discord.Interaction):

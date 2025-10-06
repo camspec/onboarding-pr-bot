@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS prs (
     name TEXT NOT NULL,
     pr_link TEXT NOT NULL,
     onboarding_type TEXT CHECK (onboarding_type in ('Firmware', 'GS')),
-    status TEXT CHECK (status in ('Pending', 'Reviewed')) DEFAULT 'Pending',
+    status TEXT CHECK (status in ('Pending', 'Approved')) DEFAULT 'Pending',
     submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     reviewed_at TIMESTAMP,
     reviewer_id INTEGER
