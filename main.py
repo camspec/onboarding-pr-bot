@@ -73,7 +73,12 @@ class PRSubmissionModal(Modal, title="Submit a PR"):
         user_id = interaction.user.id
         name = self.name.value
         pr_link = self.pr_link.value
-        onboarding_type = self.onboarding_type.component.values[0]
+
+        if isinstance(self.onboarding_type.component, Select):
+            onboarding_type = self.onboarding_type.component.values[0]
+        else:
+            onboarding_type = None
+
         try:
             with sqlite3.connect("database.db") as conn:
                 cursor = conn.cursor()
