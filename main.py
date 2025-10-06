@@ -262,7 +262,7 @@ class PRQueueView(View):
             f"onboarding_type={self.selected_pr.onboarding_type}"
         )
         await interaction.response.send_message(
-            f"You approved <@{self.selected_pr.user_id}>'s PR.", ephemeral=True
+            f"You approved <@{self.selected_pr.user_id}>'s PR. Their roles have been updated.", ephemeral=True
         )
 
     async def mark_request_changes(self, interaction: discord.Interaction):
