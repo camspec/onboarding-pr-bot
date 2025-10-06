@@ -1,8 +1,9 @@
+from datetime import datetime, timezone
 import os
 import sqlite3
 
 import discord
-from discord.ui import Label, Modal, Select, TextInput
+from discord.ui import Button, Label, Modal, Select, TextInput, View
 from dotenv import load_dotenv
 from loguru import logger
 
@@ -29,6 +30,18 @@ def init_db():
             )
     except sqlite3.Error as e:
         logger.error(f"Failed to open database: {e}")
+
+
+def is_software_lead(member: discord.Member):
+    return (
+        discord.utils.find(lambda r: r.name == "Software Lead", member.roles)
+        is not None
+    )
+
+
+def get_unix_epoch(utc_string: str):
+    utc = datetime.strptime(utc_string, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+    return int(utc.timestamp())
 
 
 @client.event
@@ -81,9 +94,114 @@ class PRSubmissionModal(Modal, title="Submit a PR"):
             )
 
 
+class PRQueueView(View):
+    def __init__(self, prs: list, user_is_lead: bool):
+        super().__init__()
+        self.prs = prs
+        self.selected_pr = None
+
+        options = [
+            discord.SelectOption(
+                label=f"{i + 1}. {pr[1]} ({pr[3]} {'⌨️' if pr[3] == 'Firmware' else '🌎'})",
+                description=pr[2],
+                value=str(i),
+            )
+            for i, pr in enumerate(prs)
+        ]
+
+        self.select = Select(placeholder="Choose a PR to act on", options=options)
+        self.select.callback = self.pr_selected
+        self.add_item(self.select)
+
+        self.reviewed_button = Button(
+            label="Reviewed",
+            style=discord.ButtonStyle.green,
+            disabled=not user_is_lead,
+        )
+        self.request_changes_button = Button(
+            label="Request Changes",
+            style=discord.ButtonStyle.red,
+            disabled=not user_is_lead,
+        )
+
+        self.reviewed_button.callback = self.mark_reviewed
+        self.request_changes_button.callback = self.mark_request_changes
+
+        self.add_item(self.reviewed_button)
+        self.add_item(self.request_changes_button)
+
+    async def pr_selected(self, interaction: discord.Interaction):
+        self.selected_pr = self.prs[int(self.select.values[0])]
+        await interaction.response.defer()
+
+    async def mark_reviewed(self, interaction: discord.Interaction):
+        if not self.selected_pr:
+            await interaction.response.send_message(
+                "Please select a PR first!", ephemeral=True
+            )
+            return
+
+        user_id, name, pr_link, onboarding_type, _ = self.selected_pr
+        logger.info(
+                f"{interaction.user.name} reviewed PR: user_id={user_id}, name={name}, pr_link={pr_link}, onboarding_type={onboarding_type}"
+        )
+        await interaction.response.send_message(
+            "okay we reviewed this one", ephemeral=True
+        )
+
+    async def mark_request_changes(self, interaction: discord.Interaction):
+        if not self.selected_pr:
+            await interaction.response.send_message(
+                "Please select a PR first!", ephemeral=True
+            )
+            return
+
+        user_id, name, pr_link, onboarding_type, _ = self.selected_pr
+        logger.info(
+                f"{interaction.user.name} requested changes for PR: user_id={user_id}, name={name}, pr_link={pr_link}, onboarding_type={onboarding_type}"
+        )
+        await interaction.response.send_message(
+            "okay we requested changes for this one", ephemeral=True
+        )
+
+
 @tree.command(description="Submit an onboarding PR")
 async def submit_onboarding(interaction: discord.Interaction):
     await interaction.response.send_modal(PRSubmissionModal())
+
+
+@tree.command(description="View the onboarding PR queue")
+async def view_onboarding_queue(interaction: discord.Interaction):
+    if not isinstance(interaction.user, discord.Member):
+        await interaction.response.send_message(
+            "This command can only be used in a server.", ephemeral=True
+        )
+        return
+
+    with sqlite3.connect("database.db") as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT user_id, name, pr_link, onboarding_type, submitted_at FROM prs"
+        )
+        prs = cursor.fetchall()
+
+    if not prs:
+        await interaction.response.send_message(
+            "The PR queue is empty.", ephemeral=True
+        )
+        return
+
+    embed = discord.Embed(title="Onboarding PR Queue")
+    for i, pr in enumerate(prs):
+        user_id, name, pr_link, onboarding_type, submitted_at = pr
+        embed.add_field(
+            name=f"{i + 1}. {name} ({onboarding_type} {'⌨️' if onboarding_type == 'Firmware' else '🌎'})",
+            value=f"<@{user_id}>\nSubmitted at: <t:{get_unix_epoch(submitted_at)}:f>\n[View PR]({pr_link})",
+            inline=False,
+        )
+    await interaction.response.send_message(
+        embed=embed, view=PRQueueView(prs, is_software_lead(interaction.user))
+    )
 
 
 init_db()
