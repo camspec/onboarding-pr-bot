@@ -289,6 +289,19 @@ class PRQueueView(View):
         if not success:
             return
 
+        user = client.get_user(self.selected_pr.user_id)
+        if user is None:
+            log_error(f"Could not find user with id {self.selected_pr.user_id}")
+            await send_client_error(
+                "we couldn't find the user that made this PR", interaction
+            )
+            return
+        await user.send(
+            f"Hi <@{self.selected_pr.user_id}>! "
+            f"Your onboarding PR was reviewed by <@{interaction.user.id}> and approved. "
+            f"Welcome to the team :)"
+        )
+
         logger.info(
             f"{interaction.user.name} ({interaction.user.id}) approved PR: "
             f"user_id={self.selected_pr.user_id}, "
@@ -317,6 +330,22 @@ class PRQueueView(View):
             )
             return
 
+        user = client.get_user(self.selected_pr.user_id)
+        if user is None:
+            log_error(f"Could not find user with id {self.selected_pr.user_id}")
+            await send_client_error(
+                "we couldn't find the user that made this PR", interaction
+            )
+            return
+
+        await user.send(
+            f"Hi <@{self.selected_pr.user_id}>! "
+            f"Your [onboarding PR]({self.selected_pr.pr_link}) ({'Firmware' if self.selected_pr.onboarding_type == 'Firmware' else 'GS'}) "
+            f"was reviewed by <@{interaction.user.id}> and they requested changes. "
+            f"Please look over your PR and make the changes, resolving comments as you go through. "
+            f"Thanks :)"
+        )
+
         logger.info(
             f"{interaction.user.name} ({interaction.user.id}) requested changes for PR: "
             f"user_id={self.selected_pr.user_id}, "
@@ -325,7 +354,7 @@ class PRQueueView(View):
             f"onboarding_type={self.selected_pr.onboarding_type}"
         )
         await interaction.response.send_message(
-            f"You requested changes for <@{self.selected_pr.user_id}>'s PR.",
+            f"You requested changes to <@{self.selected_pr.user_id}>'s PR.",
             ephemeral=True,
         )
 
