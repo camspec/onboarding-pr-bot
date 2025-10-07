@@ -204,7 +204,11 @@ class PRSubmissionModal(Modal, title="Submit a PR"):
             color=discord.Color.green(),
         )
         embed.add_field(name="User", value=interaction.user.mention, inline=True)
-        embed.add_field(name="Type", value=onboarding_type, inline=True)
+        embed.add_field(
+            name="Type",
+            value=f"{onboarding_type} {'⌨️' if onboarding_type == 'Firmware' else '🌎'}",
+            inline=True,
+        )
         embed.add_field(name="PR Link", value=f"[View PR]({pr_link})", inline=False)
 
         channel_id: int = int(
