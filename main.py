@@ -42,6 +42,7 @@ class PR:
     name: str
     pr_link: str
     onboarding_type: str
+    notion_email: str
     submitted_at: str
 
 
@@ -55,7 +56,7 @@ def init_db():
                 f"Opened SQLite database with version {sqlite3.sqlite_version} successfully."
             )
     except sqlite3.Error as e:
-        logger.error(f"Failed to open database: {e}")
+        log_error("Failed to open database", e)
 
 
 def get_unix_epoch(utc_string: str):
@@ -65,10 +66,13 @@ def get_unix_epoch(utc_string: str):
     return int(utc.timestamp())
 
 
-def approve_pr(pr_id: int):
+def approve_pr(pr_id: int, reviewer_id: int):
     with sqlite3.connect("database.db") as conn:
         cursor = conn.cursor()
-        cursor.execute("UPDATE prs SET status = 'Approved' WHERE pr_id = ?", (pr_id,))
+        cursor.execute(
+            "UPDATE prs SET status = 'Approved', reviewed_at = CURRENT_TIMESTAMP, reviewer_id =  WHERE pr_id = ?",
+            (pr_id,),
+        )
 
 
 def remove_pr(pr_id: int):
@@ -77,17 +81,17 @@ def remove_pr(pr_id: int):
         cursor.execute("DELETE FROM prs WHERE pr_id = ?", (pr_id,))
 
 
-async def send_client_error(message: str, interaction: discord.Interaction):
-    await interaction.response.send_message(
-        f"Sorry, {message}. Please let Cameron know he messed up.", ephemeral=True
-    )
-
-
 def log_error(message: str, error: Exception | None = None):
     if error:
         logger.error(f"{message}: {error}")
     else:
         logger.error(message)
+
+
+async def send_client_error(message: str, interaction: discord.Interaction):
+    await interaction.response.send_message(
+        f"Sorry, {message}. Please let Cameron know he messed up.", ephemeral=True
+    )
 
 
 async def update_roles(interaction: discord.Interaction, pr: PR) -> bool:
@@ -169,6 +173,10 @@ class PRSubmissionModal(Modal, title="Submit a PR"):
         ),
     )
 
+    notion_email = TextInput(
+        label="Notion Email", placeholder="The email you use for Notion"
+    )
+
     async def on_submit(self, interaction: discord.Interaction):
         user_id = interaction.user.id
         name = self.name.value
@@ -179,24 +187,26 @@ class PRSubmissionModal(Modal, title="Submit a PR"):
         else:
             onboarding_type = None
 
+        notion_email = self.notion_email.value
+
         try:
             with sqlite3.connect("database.db") as conn:
                 cursor = conn.cursor()
                 cursor.execute(
-                    """INSERT INTO prs (user_id, name, pr_link, onboarding_type) VALUES (?, ?, ?, ?)""",
-                    (user_id, name, pr_link, onboarding_type),
+                    """INSERT INTO prs (user_id, name, pr_link, onboarding_type, notion_email) VALUES (?, ?, ?, ?, ?)""",
+                    (user_id, name, pr_link, onboarding_type, notion_email),
                 )
         except sqlite3.Error as e:
-            logger.error(f"Failed to insert PR: {e}")
+            log_error("Failed to insert PR", e)
             await send_client_error(
                 "we failed to submit your PR due to a database error", interaction
             )
             return
         logger.info(
-            f"PR Submitted: user_id={user_id}, name={name}, pr_link={pr_link}, onboarding_type={onboarding_type}"
+            f"PR Submitted: user_id={user_id}, name={name}, pr_link={pr_link}, onboarding_type={onboarding_type}, notion_email={notion_email}"
         )
         await interaction.response.send_message(
-            f"Thanks for your response, {self.name.value}! A Software Lead will get back to you when your PR is reviewed.",
+            f"Thanks for your response, {self.name.value}! I'll let you know when a Software Lead reviews your PR.",
             ephemeral=True,
         )
         embed = discord.Embed(
@@ -220,7 +230,7 @@ class PRSubmissionModal(Modal, title="Submit a PR"):
         if isinstance(channel, discord.TextChannel):
             await channel.send(content=f"<@&{SOFTWARE_LEAD_ROLE_ID}>", embed=embed)
         else:
-            logger.error(
+            log_error(
                 f"There was a channel configuration error for channel {channel_id}"
             )
             await send_client_error(
@@ -276,9 +286,9 @@ class PRQueueView(View):
             return
 
         try:
-            approve_pr(self.selected_pr.pr_id)
+            approve_pr(self.selected_pr.pr_id, interaction.user.id)
         except sqlite3.Error as e:
-            logger.error(f"Failed to approve PR: {e}")
+            log_error("Failed to approve PR", e)
             await send_client_error(
                 "we failed to approve the PR due to a database error", interaction
             )
@@ -310,7 +320,8 @@ class PRQueueView(View):
             f"onboarding_type={self.selected_pr.onboarding_type}"
         )
         await interaction.response.send_message(
-            f"You approved <@{self.selected_pr.user_id}>'s PR. Their roles have been updated.",
+            f"You approved <@{self.selected_pr.user_id}>'s PR. Their roles have been updated and they have been notified. "
+            f"\nPlease add them to the Notion with their email: {self.selected_pr.notion_email}\nDon't forget the GitHub as well.",
             ephemeral=True,
         )
 
@@ -324,7 +335,7 @@ class PRQueueView(View):
         try:
             remove_pr(self.selected_pr.pr_id)
         except sqlite3.Error as e:
-            logger.error(f"Failed to remove PR: {e}")
+            log_error("Failed to remove PR", e)
             await send_client_error(
                 "we failed to remove the PR due to a database error", interaction
             )
@@ -381,7 +392,7 @@ async def view_onboarding_queue(interaction: discord.Interaction):
     with sqlite3.connect("database.db") as conn:
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT pr_id, user_id, name, pr_link, onboarding_type, submitted_at FROM prs WHERE status = 'Pending'"
+            "SELECT pr_id, user_id, name, pr_link, onboarding_type, notion_email, submitted_at FROM prs WHERE status = 'Pending'"
         )
         prs = [PR(*row) for row in cursor.fetchall()]
 
