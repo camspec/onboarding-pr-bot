@@ -7,8 +7,8 @@ CREATE TABLE IF NOT EXISTS prs (
     notion_email TEXT NOT NULL,
     status TEXT CHECK (status in ('Pending', 'Approved')) DEFAULT 'Pending',
     submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    reviewed_at TIMESTAMP,
-    reviewer_id INTEGER
+    approved_at TIMESTAMP,
+    approver_id INTEGER
 );
 
 CREATE INDEX IF NOT EXISTS idx_prs_status ON prs (status);

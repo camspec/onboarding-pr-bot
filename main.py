@@ -66,12 +66,12 @@ def get_unix_epoch(utc_string: str):
     return int(utc.timestamp())
 
 
-def approve_pr(pr_id: int, reviewer_id: int):
+def approve_pr(approver_id: int, pr_id: int):
     with sqlite3.connect("database.db") as conn:
         cursor = conn.cursor()
         cursor.execute(
-            "UPDATE prs SET status = 'Approved', reviewed_at = CURRENT_TIMESTAMP, reviewer_id =  WHERE pr_id = ?",
-            (pr_id,),
+            "UPDATE prs SET status = 'Approved', approved_at = CURRENT_TIMESTAMP, approver_id = ? WHERE pr_id = ?",
+            (approver_id, pr_id),
         )
 
 
@@ -286,7 +286,7 @@ class PRQueueView(View):
             return
 
         try:
-            approve_pr(self.selected_pr.pr_id, interaction.user.id)
+            approve_pr(interaction.user.id, self.selected_pr.pr_id)
         except sqlite3.Error as e:
             log_error("Failed to approve PR", e)
             await send_client_error(
