@@ -9,10 +9,23 @@ from dotenv import load_dotenv
 from loguru import logger
 
 
+def require_env(var_name: str) -> str:
+    value = os.getenv(var_name)
+    if value is None:
+        raise ValueError(f"{var_name} is not set in .env")
+    return value
+
+
 load_dotenv()
-TOKEN = os.getenv("TOKEN")
-if TOKEN is None:
-    raise ValueError("TOKEN is not set in .env")
+TOKEN: str = require_env("TOKEN")
+SOFTWARE_LEAD_ROLE_ID: str = require_env("SOFTWARE_LEAD_ROLE_ID")
+SOFTWARE_ROLE_ID: str = require_env("SOFTWARE_ROLE_ID")
+FW_ROLE_ID: str = require_env("FW_ROLE_ID")
+GS_ROLE_ID: str = require_env("GS_ROLE_ID")
+FW_ONBOARDING_ROLE_ID: str = require_env("FW_ONBOARDING_ROLE_ID")
+GS_ONBOARDING_ROLE_ID: str = require_env("GS_ONBOARDING_ROLE_ID")
+FW_ONBOARDING_CHANNEL_ID: str = require_env("FW_ONBOARDING_CHANNEL_ID")
+GS_ONBOARDING_CHANNEL_ID: str = require_env("GS_ONBOARDING_CHANNEL_ID")
 
 intents = discord.Intents.default()
 intents.members = True
@@ -45,13 +58,6 @@ def init_db():
         logger.error(f"Failed to open database: {e}")
 
 
-def is_software_lead(member: discord.Member):
-    return (
-        discord.utils.find(lambda r: r.name == "Software Lead", member.roles)
-        is not None
-    )
-
-
 def get_unix_epoch(utc_string: str):
     utc = datetime.strptime(utc_string, "%Y-%m-%d %H:%M:%S").replace(
         tzinfo=timezone.utc
@@ -71,48 +77,52 @@ def remove_pr(pr_id: int):
         cursor.execute("DELETE FROM prs WHERE pr_id = ?", (pr_id,))
 
 
+async def send_client_error(message: str, interaction: discord.Interaction):
+    await interaction.response.send_message(
+        f"Sorry, {message}. Please let Cameron know he messed up.", ephemeral=True
+    )
+
+
+def log_error(message: str, error: Exception | None = None):
+    if error:
+        logger.error(f"{message}: {error}")
+    else:
+        logger.error(message)
+
+
 async def update_roles(interaction: discord.Interaction, pr: PR) -> bool:
     if interaction.guild:
         print(interaction.guild.members)
         member = interaction.guild.get_member(pr.user_id)
         if not member:
-            logger.error(f"Couldn't find the user {pr.user_id} in the server.")
-            await interaction.response.send_message(
-                f"Sorry, we couldn't find the user <@{pr.user_id}> in the server. Please let Cameron know he messed up.",
-                ephemeral=True,
+            log_error(f"Couldn't find the user {pr.user_id} in the server.")
+            await send_client_error(
+                f"we couldn't find the user <@{pr.user_id}> in the server", interaction
             )
             return False
 
-        software_role = discord.utils.find(
-            lambda r: r.name == "Software", interaction.guild.roles
-        )
-        firmware_role = discord.utils.find(
-            lambda r: r.name == "Firmware", interaction.guild.roles
-        )
-        gs_role = discord.utils.find(lambda r: r.name == "GS", interaction.guild.roles)
-        fw_onboarding_role = discord.utils.find(
-            lambda r: r.name == "FW-Onboarding", interaction.guild.roles
-        )
-        gs_onboarding_role = discord.utils.find(
-            lambda r: r.name == "GS-Onboarding", interaction.guild.roles
-        )
+        software_role = interaction.guild.get_role(int(SOFTWARE_ROLE_ID))
+        fw_role = interaction.guild.get_role(int(FW_ROLE_ID))
+        gs_role = interaction.guild.get_role(int(GS_ROLE_ID))
+        fw_onboarding_role = interaction.guild.get_role(int(FW_ONBOARDING_ROLE_ID))
+        gs_onboarding_role = interaction.guild.get_role(int(GS_ONBOARDING_ROLE_ID))
         if not all(
             [
                 software_role,
-                firmware_role,
+                fw_role,
                 gs_role,
                 fw_onboarding_role,
                 gs_onboarding_role,
             ]
         ):
-            logger.error("One or more required roles are missing in the server.")
-            await interaction.response.send_message(
-                "One or more required roles are missing in the server.", ephemeral=True
+            log_error("One or more required roles are missing in the server.")
+            await send_client_error(
+                "one or more required roles are missing in the server", interaction
             )
             return False
 
         assert software_role is not None
-        assert firmware_role is not None
+        assert fw_role is not None
         assert gs_role is not None
         assert fw_onboarding_role is not None
         assert gs_onboarding_role is not None
@@ -120,16 +130,13 @@ async def update_roles(interaction: discord.Interaction, pr: PR) -> bool:
         try:
             if pr.onboarding_type == "Firmware":
                 await member.remove_roles(fw_onboarding_role)
-                await member.add_roles(software_role, firmware_role)
+                await member.add_roles(software_role, fw_role)
             else:
                 await member.remove_roles(gs_onboarding_role)
                 await member.add_roles(software_role, gs_role)
         except discord.DiscordException as e:
-            logger.error(f"Failed to update roles for {pr.user_id}: {e}")
-            await interaction.response.send_message(
-                "Sorry, we failed to update roles. Please let Cameron know he messed up.",
-                ephemeral=True,
-            )
+            log_error(f"Failed to update roles for {pr.user_id}", e)
+            await send_client_error("we failed to update roles", interaction)
             return False
 
         return True
@@ -181,9 +188,8 @@ class PRSubmissionModal(Modal, title="Submit a PR"):
                 )
         except sqlite3.Error as e:
             logger.error(f"Failed to insert PR: {e}")
-            await interaction.response.send_message(
-                "Sorry, we failed to submit your PR due to a database error. Please let Cameron know he messed up.",
-                ephemeral=True,
+            await send_client_error(
+                "we failed to submit your PR due to a database error", interaction
             )
             return
         logger.info(
@@ -193,6 +199,29 @@ class PRSubmissionModal(Modal, title="Submit a PR"):
             f"Thanks for your response, {self.name.value}! A Software Lead will get back to you when your PR is reviewed.",
             ephemeral=True,
         )
+        embed = discord.Embed(
+            title="New Onboarding PR Submitted",
+            color=discord.Color.green(),
+        )
+        embed.add_field(name="User", value=interaction.user.mention, inline=True)
+        embed.add_field(name="Type", value=onboarding_type, inline=True)
+        embed.add_field(name="PR Link", value=f"[View PR]({pr_link})", inline=False)
+
+        channel_id: int = int(
+            FW_ONBOARDING_CHANNEL_ID
+            if onboarding_type == "Firmware"
+            else GS_ONBOARDING_CHANNEL_ID
+        )
+        channel = interaction.client.get_channel(channel_id)
+        if isinstance(channel, discord.TextChannel):
+            await channel.send(content=f"<@&{SOFTWARE_LEAD_ROLE_ID}>", embed=embed)
+        else:
+            logger.error(
+                f"There was a channel configuration error for channel {channel_id}"
+            )
+            await send_client_error(
+                "there was a channel configuration error", interaction
+            )
 
 
 class PRQueueView(View):
@@ -246,9 +275,8 @@ class PRQueueView(View):
             approve_pr(self.selected_pr.pr_id)
         except sqlite3.Error as e:
             logger.error(f"Failed to approve PR: {e}")
-            await interaction.response.send_message(
-                "Sorry, we failed to approve the PR due to a database error. Please let Cameron know he messed up.",
-                ephemeral=True,
+            await send_client_error(
+                "we failed to approve the PR due to a database error", interaction
             )
             return
 
@@ -265,7 +293,8 @@ class PRQueueView(View):
             f"onboarding_type={self.selected_pr.onboarding_type}"
         )
         await interaction.response.send_message(
-            f"You approved <@{self.selected_pr.user_id}>'s PR. Their roles have been updated.", ephemeral=True
+            f"You approved <@{self.selected_pr.user_id}>'s PR. Their roles have been updated.",
+            ephemeral=True,
         )
 
     async def mark_request_changes(self, interaction: discord.Interaction):
@@ -279,9 +308,8 @@ class PRQueueView(View):
             remove_pr(self.selected_pr.pr_id)
         except sqlite3.Error as e:
             logger.error(f"Failed to remove PR: {e}")
-            await interaction.response.send_message(
-                "Sorry, we failed to remove the PR due to a database error. Please let Cameron know he messed up.",
-                ephemeral=True,
+            await send_client_error(
+                "we failed to remove the PR due to a database error", interaction
             )
             return
 
@@ -338,7 +366,10 @@ async def view_onboarding_queue(interaction: discord.Interaction):
             inline=False,
         )
     await interaction.response.send_message(
-        embed=embed, view=PRQueueView(prs, is_software_lead(interaction.user))
+        embed=embed,
+        view=PRQueueView(
+            prs, interaction.user.get_role(int(SOFTWARE_LEAD_ROLE_ID)) is not None
+        ),
     )
 
 
