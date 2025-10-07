@@ -317,7 +317,8 @@ class PRQueueView(View):
             f"user_id={self.selected_pr.user_id}, "
             f"name={self.selected_pr.name}, "
             f"pr_link={self.selected_pr.pr_link}, "
-            f"onboarding_type={self.selected_pr.onboarding_type}"
+            f"onboarding_type={self.selected_pr.onboarding_type}, "
+            f"notion_email={self.selected_pr.notion_email}"
         )
         await interaction.response.send_message(
             f"You approved <@{self.selected_pr.user_id}>'s PR. Their roles have been updated and they have been notified. "
@@ -362,7 +363,8 @@ class PRQueueView(View):
             f"user_id={self.selected_pr.user_id}, "
             f"name={self.selected_pr.name}, "
             f"pr_link={self.selected_pr.pr_link}, "
-            f"onboarding_type={self.selected_pr.onboarding_type}"
+            f"onboarding_type={self.selected_pr.onboarding_type}, "
+            f"notion_email={self.selected_pr.notion_email}"
         )
         await interaction.response.send_message(
             f"You requested changes to <@{self.selected_pr.user_id}>'s PR.",
