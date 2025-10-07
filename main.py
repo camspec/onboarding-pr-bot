@@ -308,7 +308,8 @@ class PRQueueView(View):
             return
         await user.send(
             f"Hi <@{self.selected_pr.user_id}>! "
-            f"Your onboarding PR was reviewed by <@{interaction.user.id}> and approved. "
+            f"Your [onboarding PR]({self.selected_pr.pr_link}) ({'Firmware' if self.selected_pr.onboarding_type == 'Firmware' else 'GS'}) "
+            f"was reviewed by <@{interaction.user.id}> and approved. "
             f"Welcome to the team :)"
         )
 
