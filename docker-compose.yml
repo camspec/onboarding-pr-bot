@@ -1,0 +1,6 @@
+services:
+  bot:
+    build: .
+    restart: unless-stopped
+    volumes:
+      - .:/usr/src/app
