@@ -96,7 +96,6 @@ async def send_client_error(message: str, interaction: discord.Interaction):
 
 async def update_roles(interaction: discord.Interaction, pr: PR) -> bool:
     if interaction.guild:
-        print(interaction.guild.members)
         member = interaction.guild.get_member(pr.user_id)
         if not member:
             log_error(f"Couldn't find the user {pr.user_id} in the server.")
