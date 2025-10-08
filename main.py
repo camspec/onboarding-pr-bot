@@ -417,6 +417,7 @@ async def view_onboarding_queue(interaction: discord.Interaction):
         view=PRQueueView(
             prs, interaction.user.get_role(int(SOFTWARE_LEAD_ROLE_ID)) is not None
         ),
+        ephemeral=True,
     )
 
 
