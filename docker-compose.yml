@@ -1,5 +1,5 @@
 services:
-  bot:
+  coopercat:
     build: .
     restart: unless-stopped
     volumes:

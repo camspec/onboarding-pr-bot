@@ -5,4 +5,6 @@ WORKDIR /usr/src/app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+ENV TZ="America/Toronto"
+
 CMD [ "python", "main.py" ]

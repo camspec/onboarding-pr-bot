@@ -32,6 +32,7 @@ intents.members = True
 client = discord.Client(intents=intents)
 tree = discord.app_commands.CommandTree(client)
 
+logger.remove()
 logger.add("bot.log")
 
 
