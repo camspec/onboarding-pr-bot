@@ -151,7 +151,7 @@ async def update_roles(interaction: discord.Interaction, pr: PR) -> bool:
 async def on_ready():
     await tree.sync()
     await client.change_presence(
-        activity=discord.Activity(type=discord.ActivityType.listening, name="Weezer")
+        activity=discord.Activity(type=discord.ActivityType.listening, name="/submit_onboarding")
     )
     logger.info(f"We have logged on as {client.user}")
 
