@@ -151,7 +151,9 @@ async def update_roles(interaction: discord.Interaction, pr: PR) -> bool:
 async def on_ready():
     await tree.sync()
     await client.change_presence(
-        activity=discord.Activity(type=discord.ActivityType.listening, name="/submit_onboarding")
+        activity=discord.Activity(
+            type=discord.ActivityType.listening, name="/submit_onboarding"
+        )
     )
     logger.info(f"We have logged on as {client.user}")
 
@@ -355,7 +357,7 @@ class PRQueueView(View):
             f"Hi <@{self.selected_pr.user_id}>! "
             f"Your [onboarding PR]({self.selected_pr.pr_link}) ({'Firmware' if self.selected_pr.onboarding_type == 'Firmware' else 'GS'}) "
             f"was reviewed by <@{interaction.user.id}> and they requested changes. "
-            f"Please look over your PR and make the changes, resolving comments as you go through. "
+            f"Please look over your PR and make the changes, resolving comments as you go through. When you're done, resubmit your PR to me."
             f"Thanks :)"
         )
 
