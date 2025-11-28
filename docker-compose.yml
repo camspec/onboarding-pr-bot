@@ -1,5 +1,5 @@
 services:
-  coopercat:
+  orbi:
     build: .
     restart: unless-stopped
     volumes:
