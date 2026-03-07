@@ -249,7 +249,7 @@ class PRQueueView(View):
         options = [
             discord.SelectOption(
                 label=f"{i + 1}. {pr.name} ({pr.onboarding_type} {'⌨️' if pr.onboarding_type == 'Firmware' else '🌎'})",
-                description=pr.pr_link,
+                description=pr.pr_link[:100],
                 value=str(i),
             )
             for i, pr in enumerate(prs)
