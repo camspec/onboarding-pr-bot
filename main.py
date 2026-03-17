@@ -308,12 +308,6 @@ class PRQueueView(View):
                 "we couldn't find the user that made this PR", interaction
             )
             return
-        await user.send(
-            f"Hi <@{self.selected_pr.user_id}>! "
-            f"Your [onboarding PR]({self.selected_pr.pr_link}) ({'Firmware' if self.selected_pr.onboarding_type == 'Firmware' else 'GS'}) "
-            f"was reviewed by <@{interaction.user.id}> and approved. "
-            f"Welcome to the team :)"
-        )
 
         logger.info(
             f"{interaction.user.name} ({interaction.user.id}) approved PR: "
@@ -327,6 +321,12 @@ class PRQueueView(View):
             f"You approved <@{self.selected_pr.user_id}>'s PR. Their roles have been updated and they have been notified. "
             f"\nPlease add them to the Notion with their email: {self.selected_pr.notion_email}\nDon't forget the GitHub as well.",
             ephemeral=True,
+        )
+        await user.send(
+            f"Hi <@{self.selected_pr.user_id}>! "
+            f"Your [onboarding PR]({self.selected_pr.pr_link}) ({'Firmware' if self.selected_pr.onboarding_type == 'Firmware' else 'GS'}) "
+            f"was reviewed by <@{interaction.user.id}> and approved. "
+            f"Welcome to the team :)"
         )
 
     async def mark_request_changes(self, interaction: discord.Interaction):
@@ -353,14 +353,6 @@ class PRQueueView(View):
             )
             return
 
-        await user.send(
-            f"Hi <@{self.selected_pr.user_id}>! "
-            f"Your [onboarding PR]({self.selected_pr.pr_link}) ({'Firmware' if self.selected_pr.onboarding_type == 'Firmware' else 'GS'}) "
-            f"was reviewed by <@{interaction.user.id}> and they requested changes. "
-            f"Please look over your PR and make the changes, resolving comments as you go through. When you're done, resubmit your PR to me. "
-            f"Thanks :)"
-        )
-
         logger.info(
             f"{interaction.user.name} ({interaction.user.id}) requested changes for PR: "
             f"user_id={self.selected_pr.user_id}, "
@@ -372,6 +364,13 @@ class PRQueueView(View):
         await interaction.response.send_message(
             f"You requested changes to <@{self.selected_pr.user_id}>'s PR.",
             ephemeral=True,
+        )
+        await user.send(
+            f"Hi <@{self.selected_pr.user_id}>! "
+            f"Your [onboarding PR]({self.selected_pr.pr_link}) ({'Firmware' if self.selected_pr.onboarding_type == 'Firmware' else 'GS'}) "
+            f"was reviewed by <@{interaction.user.id}> and they requested changes. "
+            f"Please look over your PR and make the changes, resolving comments as you go through. When you're done, resubmit your PR to me. "
+            f"Thanks :)"
         )
 
 
