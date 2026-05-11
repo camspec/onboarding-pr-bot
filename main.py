@@ -19,6 +19,7 @@ def require_env(var_name: str) -> str:
 load_dotenv()
 TOKEN: str = require_env("TOKEN")
 SOFTWARE_LEAD_ROLE_ID: str = require_env("SOFTWARE_LEAD_ROLE_ID")
+PM_ROLE_ID: str = require_env("PM_ROLE_ID")
 SOFTWARE_ROLE_ID: str = require_env("SOFTWARE_ROLE_ID")
 FW_ROLE_ID: str = require_env("FW_ROLE_ID")
 GS_ROLE_ID: str = require_env("GS_ROLE_ID")
@@ -416,7 +417,7 @@ async def view_onboarding_queue(interaction: discord.Interaction):
     await interaction.response.send_message(
         embed=embed,
         view=PRQueueView(
-            prs, interaction.user.get_role(int(SOFTWARE_LEAD_ROLE_ID)) is not None
+            prs, any(interaction.user.get_role(int(r)) for r in [SOFTWARE_LEAD_ROLE_ID, PM_ROLE_ID])
         ),
         ephemeral=True,
     )
