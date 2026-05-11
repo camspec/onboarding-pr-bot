@@ -282,6 +282,11 @@ class PRQueueView(View):
         await interaction.response.defer()
 
     async def mark_approved(self, interaction: discord.Interaction):
+        if not isinstance(interaction.user, discord.Member) or not any(
+            interaction.user.get_role(int(r)) for r in [SOFTWARE_LEAD_ROLE_ID, PM_ROLE_ID]
+        ):
+            await interaction.response.send_message("You don't have permission to do this.", ephemeral=True)
+            return
         if not self.selected_pr:
             await interaction.response.send_message(
                 "Please select a PR first!", ephemeral=True
@@ -331,6 +336,14 @@ class PRQueueView(View):
         )
 
     async def mark_request_changes(self, interaction: discord.Interaction):
+        if not isinstance(interaction.user, discord.Member) or not any(
+            interaction.user.get_role(int(r))
+            for r in [SOFTWARE_LEAD_ROLE_ID, PM_ROLE_ID]
+        ):
+            await interaction.response.send_message(
+                "You don't have permission to do this.", ephemeral=True
+            )
+            return
         if not self.selected_pr:
             await interaction.response.send_message(
                 "Please select a PR first!", ephemeral=True
