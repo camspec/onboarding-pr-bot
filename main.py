@@ -109,14 +109,12 @@ async def update_roles(interaction: discord.Interaction, pr: PR) -> bool:
         sw_role = interaction.guild.get_role(int(SW_ROLE_ID))
         fw_onboarding_role = interaction.guild.get_role(int(FW_ONBOARDING_ROLE_ID))
         sw_onboarding_role = interaction.guild.get_role(int(SW_ONBOARDING_ROLE_ID))
-        if not all(
-            [
-                fw_role,
-                sw_role,
-                fw_onboarding_role,
-                sw_onboarding_role,
-            ]
-        ):
+        if not all([
+            fw_role,
+            sw_role,
+            fw_onboarding_role,
+            sw_onboarding_role,
+        ]):
             log_error("One or more required roles are missing in the server.")
             await send_client_error(
                 "one or more required roles are missing in the server", interaction
@@ -278,9 +276,12 @@ class PRQueueView(View):
 
     async def mark_approved(self, interaction: discord.Interaction):
         if not isinstance(interaction.user, discord.Member) or not any(
-            interaction.user.get_role(int(r)) for r in [FIRMWARE_LEAD_ROLE_ID, SOFTWARE_LEAD_ROLE_ID]
+            interaction.user.get_role(int(r))
+            for r in [FIRMWARE_LEAD_ROLE_ID, SOFTWARE_LEAD_ROLE_ID]
         ):
-            await interaction.response.send_message("You don't have permission to do this.", ephemeral=True)
+            await interaction.response.send_message(
+                "You don't have permission to do this.", ephemeral=True
+            )
             return
         if not self.selected_pr:
             await interaction.response.send_message(
@@ -425,7 +426,11 @@ async def view_onboarding_queue(interaction: discord.Interaction):
     await interaction.response.send_message(
         embed=embed,
         view=PRQueueView(
-            prs, any(interaction.user.get_role(int(r)) for r in [FIRMWARE_LEAD_ROLE_ID, SOFTWARE_LEAD_ROLE_ID])
+            prs,
+            any(
+                interaction.user.get_role(int(r))
+                for r in [FIRMWARE_LEAD_ROLE_ID, SOFTWARE_LEAD_ROLE_ID]
+            ),
         ),
         ephemeral=True,
     )
