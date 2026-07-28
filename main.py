@@ -212,7 +212,7 @@ class PRSubmissionModal(Modal, title="Submit a PR"):
         embed.add_field(name="User", value=interaction.user.mention, inline=True)
         embed.add_field(
             name="Type",
-            value=f"{onboarding_type} {'⌨️' if onboarding_type == 'Firmware' else '🌎'}",
+            value=f"{onboarding_type} {'⚙️' if onboarding_type == 'Firmware' else '⌨️'}",
             inline=True,
         )
         embed.add_field(name="PR Link", value=f"[View PR]({pr_link})", inline=False)
@@ -242,7 +242,7 @@ class PRQueueView(View):
 
         options = [
             discord.SelectOption(
-                label=f"{i + 1}. {pr.name} ({pr.onboarding_type} {'⌨️' if pr.onboarding_type == 'Firmware' else '🌎'})",
+                label=f"{i + 1}. {pr.name} ({pr.onboarding_type} {'⚙️' if pr.onboarding_type == 'Firmware' else '⌨️'})",
                 description=pr.pr_link[:100],
                 value=str(i),
             )
