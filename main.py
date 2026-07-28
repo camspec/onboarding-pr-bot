@@ -18,15 +18,14 @@ def require_env(var_name: str) -> str:
 
 load_dotenv()
 TOKEN: str = require_env("TOKEN")
+FIRMWARE_LEAD_ROLE_ID: str = require_env("FIRMWARE_LEAD_ROLE_ID")
 SOFTWARE_LEAD_ROLE_ID: str = require_env("SOFTWARE_LEAD_ROLE_ID")
-PM_ROLE_ID: str = require_env("PM_ROLE_ID")
-SOFTWARE_ROLE_ID: str = require_env("SOFTWARE_ROLE_ID")
 FW_ROLE_ID: str = require_env("FW_ROLE_ID")
-GS_ROLE_ID: str = require_env("GS_ROLE_ID")
+SW_ROLE_ID: str = require_env("SW_ROLE_ID")
 FW_ONBOARDING_ROLE_ID: str = require_env("FW_ONBOARDING_ROLE_ID")
-GS_ONBOARDING_ROLE_ID: str = require_env("GS_ONBOARDING_ROLE_ID")
+SW_ONBOARDING_ROLE_ID: str = require_env("SW_ONBOARDING_ROLE_ID")
 FW_ONBOARDING_CHANNEL_ID: str = require_env("FW_ONBOARDING_CHANNEL_ID")
-GS_ONBOARDING_CHANNEL_ID: str = require_env("GS_ONBOARDING_CHANNEL_ID")
+SW_ONBOARDING_CHANNEL_ID: str = require_env("SW_ONBOARDING_CHANNEL_ID")
 
 intents = discord.Intents.default()
 intents.members = True
@@ -106,18 +105,16 @@ async def update_roles(interaction: discord.Interaction, pr: PR) -> bool:
             )
             return False
 
-        software_role = interaction.guild.get_role(int(SOFTWARE_ROLE_ID))
         fw_role = interaction.guild.get_role(int(FW_ROLE_ID))
-        gs_role = interaction.guild.get_role(int(GS_ROLE_ID))
+        sw_role = interaction.guild.get_role(int(SW_ROLE_ID))
         fw_onboarding_role = interaction.guild.get_role(int(FW_ONBOARDING_ROLE_ID))
-        gs_onboarding_role = interaction.guild.get_role(int(GS_ONBOARDING_ROLE_ID))
+        sw_onboarding_role = interaction.guild.get_role(int(SW_ONBOARDING_ROLE_ID))
         if not all(
             [
-                software_role,
                 fw_role,
-                gs_role,
+                sw_role,
                 fw_onboarding_role,
-                gs_onboarding_role,
+                sw_onboarding_role,
             ]
         ):
             log_error("One or more required roles are missing in the server.")
@@ -126,19 +123,17 @@ async def update_roles(interaction: discord.Interaction, pr: PR) -> bool:
             )
             return False
 
-        assert software_role is not None
         assert fw_role is not None
-        assert gs_role is not None
+        assert sw_role is not None
         assert fw_onboarding_role is not None
-        assert gs_onboarding_role is not None
+        assert sw_onboarding_role is not None
 
         try:
             if pr.onboarding_type == "Firmware":
                 await member.remove_roles(fw_onboarding_role)
-                await member.add_roles(software_role, fw_role)
+                await member.add_roles(fw_role)
             else:
-                await member.remove_roles(gs_onboarding_role)
-                await member.add_roles(software_role, gs_role)
+                await member.add_roles(sw_role)
         except discord.DiscordException as e:
             log_error(f"Failed to update roles for {pr.user_id}", e)
             await send_client_error("we failed to update roles", interaction)
@@ -171,7 +166,7 @@ class PRSubmissionModal(Modal, title="Submit a PR"):
             placeholder="Choose your onboarding type",
             options=[
                 discord.SelectOption(label="Firmware"),
-                discord.SelectOption(label="GS"),
+                discord.SelectOption(label="Software"),
             ],
         ),
     )
@@ -227,7 +222,7 @@ class PRSubmissionModal(Modal, title="Submit a PR"):
         channel_id: int = int(
             FW_ONBOARDING_CHANNEL_ID
             if onboarding_type == "Firmware"
-            else GS_ONBOARDING_CHANNEL_ID
+            else SW_ONBOARDING_CHANNEL_ID
         )
         channel = interaction.client.get_channel(channel_id)
         if isinstance(channel, discord.TextChannel):
@@ -283,7 +278,7 @@ class PRQueueView(View):
 
     async def mark_approved(self, interaction: discord.Interaction):
         if not isinstance(interaction.user, discord.Member) or not any(
-            interaction.user.get_role(int(r)) for r in [SOFTWARE_LEAD_ROLE_ID, PM_ROLE_ID]
+            interaction.user.get_role(int(r)) for r in [FIRMWARE_LEAD_ROLE_ID, SOFTWARE_LEAD_ROLE_ID]
         ):
             await interaction.response.send_message("You don't have permission to do this.", ephemeral=True)
             return
@@ -330,7 +325,7 @@ class PRQueueView(View):
         )
         await user.send(
             f"Hi <@{self.selected_pr.user_id}>! "
-            f"Your [onboarding PR]({self.selected_pr.pr_link}) ({'Firmware' if self.selected_pr.onboarding_type == 'Firmware' else 'GS'}) "
+            f"Your [onboarding PR]({self.selected_pr.pr_link}) ({'Firmware' if self.selected_pr.onboarding_type == 'Firmware' else 'Software'}) "
             f"was reviewed by <@{interaction.user.id}> and approved. "
             f"Welcome to the team :)"
         )
@@ -338,7 +333,7 @@ class PRQueueView(View):
     async def mark_request_changes(self, interaction: discord.Interaction):
         if not isinstance(interaction.user, discord.Member) or not any(
             interaction.user.get_role(int(r))
-            for r in [SOFTWARE_LEAD_ROLE_ID, PM_ROLE_ID]
+            for r in [FIRMWARE_LEAD_ROLE_ID, SOFTWARE_LEAD_ROLE_ID]
         ):
             await interaction.response.send_message(
                 "You don't have permission to do this.", ephemeral=True
@@ -381,7 +376,7 @@ class PRQueueView(View):
         )
         await user.send(
             f"Hi <@{self.selected_pr.user_id}>! "
-            f"Your [onboarding PR]({self.selected_pr.pr_link}) ({'Firmware' if self.selected_pr.onboarding_type == 'Firmware' else 'GS'}) "
+            f"Your [onboarding PR]({self.selected_pr.pr_link}) ({'Firmware' if self.selected_pr.onboarding_type == 'Firmware' else 'Software'}) "
             f"was reviewed by <@{interaction.user.id}> and they requested changes. "
             f"Please look over your PR and make the changes, resolving comments as you go through. When you're done, resubmit your PR to me. "
             f"Thanks :)"
@@ -423,14 +418,14 @@ async def view_onboarding_queue(interaction: discord.Interaction):
     embed = discord.Embed(title="Onboarding PR Queue")
     for i, pr in enumerate(prs):
         embed.add_field(
-            name=f"{i + 1}. {pr.name} ({pr.onboarding_type} {'⌨️' if pr.onboarding_type == 'Firmware' else '🌎'})",
+            name=f"{i + 1}. {pr.name} ({pr.onboarding_type} {'⚙️' if pr.onboarding_type == 'Firmware' else '⌨️'})",
             value=f"<@{pr.user_id}>\nSubmitted at: <t:{get_unix_epoch(pr.submitted_at)}:f>\n[View PR]({pr.pr_link})",
             inline=False,
         )
     await interaction.response.send_message(
         embed=embed,
         view=PRQueueView(
-            prs, any(interaction.user.get_role(int(r)) for r in [SOFTWARE_LEAD_ROLE_ID, PM_ROLE_ID])
+            prs, any(interaction.user.get_role(int(r)) for r in [FIRMWARE_LEAD_ROLE_ID, SOFTWARE_LEAD_ROLE_ID])
         ),
         ephemeral=True,
     )
