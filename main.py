@@ -222,9 +222,14 @@ class PRSubmissionModal(Modal, title="Submit a PR"):
             if onboarding_type == "Firmware"
             else SW_ONBOARDING_CHANNEL_ID
         )
+        ping_id: int = int(
+            FIRMWARE_LEAD_ROLE_ID
+            if onboarding_type == "Firmware"
+            else SOFTWARE_LEAD_ROLE_ID
+        )
         channel = interaction.client.get_channel(channel_id)
         if isinstance(channel, discord.TextChannel):
-            await channel.send(content=f"<@&{SOFTWARE_LEAD_ROLE_ID}>", embed=embed)
+            await channel.send(content=f"<@&{ping_id}>", embed=embed)
         else:
             log_error(
                 f"There was a channel configuration error for channel {channel_id}"
