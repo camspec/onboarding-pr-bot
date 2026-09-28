@@ -131,6 +131,7 @@ async def update_roles(interaction: discord.Interaction, pr: PR) -> bool:
                 await member.remove_roles(fw_onboarding_role)
                 await member.add_roles(fw_role)
             else:
+                await member.remove_roles(sw_onboarding_role)
                 await member.add_roles(sw_role)
         except discord.DiscordException as e:
             log_error(f"Failed to update roles for {pr.user_id}", e)
