@@ -67,19 +67,61 @@ def get_unix_epoch(utc_string: str):
     return int(utc.timestamp())
 
 
+def submit_pr(
+    user_id: int,
+    name: str,
+    pr_link: str,
+    onboarding_type: str | None,
+    notion_email: str,
+):
+    with sqlite3.connect("database.db") as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT pr_id, name, pr_link, onboarding_type, notion_email FROM prs WHERE user_id = ? AND status = 'Pending'",
+            (user_id,),
+        )
+        row = cursor.fetchone()
+        if row is None:
+            cursor.execute(
+                "INSERT INTO prs (user_id, name, pr_link, onboarding_type, notion_email) VALUES (?, ?, ?, ?, ?)",
+                (user_id, name, pr_link, onboarding_type, notion_email),
+            )
+            return "created"
+        if tuple(row[1:]) == (name, pr_link, onboarding_type, notion_email):
+            return "unchanged"
+        cursor.execute(
+            "UPDATE prs SET name = ?, pr_link = ?, onboarding_type = ?, notion_email = ?, submitted_at = CURRENT_TIMESTAMP WHERE pr_id = ?",
+            (name, pr_link, onboarding_type, notion_email, row[0]),
+        )
+        return "updated"
+
+
 def approve_pr(approver_id: int, pr_id: int):
     with sqlite3.connect("database.db") as conn:
         cursor = conn.cursor()
         cursor.execute(
-            "UPDATE prs SET status = 'Approved', approved_at = CURRENT_TIMESTAMP, approver_id = ? WHERE pr_id = ?",
+            "UPDATE prs SET status = 'Approved', approved_at = CURRENT_TIMESTAMP, approver_id = ? WHERE pr_id = ? AND status = 'Pending'",
             (approver_id, pr_id),
+        )
+        return cursor.rowcount == 1
+
+
+def unapprove_pr(pr_id: int):
+    with sqlite3.connect("database.db") as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE prs SET status = 'Pending', approved_at = NULL, approver_id = NULL WHERE pr_id = ? AND status = 'Approved'",
+            (pr_id,),
         )
 
 
 def remove_pr(pr_id: int):
     with sqlite3.connect("database.db") as conn:
         cursor = conn.cursor()
-        cursor.execute("DELETE FROM prs WHERE pr_id = ?", (pr_id,))
+        cursor.execute(
+            "DELETE FROM prs WHERE pr_id = ? AND status = 'Pending'", (pr_id,)
+        )
+        return cursor.rowcount == 1
 
 
 def log_error(message: str, error: Exception | None = None):
@@ -187,27 +229,30 @@ class PRSubmissionModal(Modal, title="Submit a PR"):
         notion_email = self.notion_email.value
 
         try:
-            with sqlite3.connect("database.db") as conn:
-                cursor = conn.cursor()
-                cursor.execute(
-                    """INSERT INTO prs (user_id, name, pr_link, onboarding_type, notion_email) VALUES (?, ?, ?, ?, ?)""",
-                    (user_id, name, pr_link, onboarding_type, notion_email),
-                )
+            result = submit_pr(user_id, name, pr_link, onboarding_type, notion_email)
         except sqlite3.Error as e:
             log_error("Failed to insert PR", e)
             await send_client_error(
                 "we failed to submit your PR due to a database error", interaction
             )
             return
+        if result == "unchanged":
+            await interaction.response.send_message(
+                "You've already submitted this PR and it's waiting for review. I'll let you know when a lead reviews it.",
+                ephemeral=True,
+            )
+            return
         logger.info(
-            f"PR Submitted: user_id={user_id}, name={name}, pr_link={pr_link}, onboarding_type={onboarding_type}, notion_email={notion_email}"
+            f"PR {'Submitted' if result == 'created' else 'Updated'}: user_id={user_id}, name={name}, pr_link={pr_link}, onboarding_type={onboarding_type}, notion_email={notion_email}"
         )
         await interaction.response.send_message(
             f"Thanks for your response, {self.name.value}! I'll let you know when a Software Lead reviews your PR.",
             ephemeral=True,
         )
         embed = discord.Embed(
-            title="New Onboarding PR Submitted",
+            title="New Onboarding PR Submitted"
+            if result == "created"
+            else "Onboarding PR Updated",
             color=discord.Color.green(),
         )
         embed.add_field(name="User", value=interaction.user.mention, inline=True)
@@ -295,8 +340,16 @@ class PRQueueView(View):
             )
             return
 
+        user = client.get_user(self.selected_pr.user_id)
+        if user is None:
+            log_error(f"Could not find user with id {self.selected_pr.user_id}")
+            await send_client_error(
+                "we couldn't find the user that made this PR", interaction
+            )
+            return
+
         try:
-            approve_pr(interaction.user.id, self.selected_pr.pr_id)
+            approved = approve_pr(interaction.user.id, self.selected_pr.pr_id)
         except sqlite3.Error as e:
             log_error("Failed to approve PR", e)
             await send_client_error(
@@ -304,17 +357,19 @@ class PRQueueView(View):
             )
             return
 
+        if not approved:
+            await interaction.response.send_message(
+                "This PR has already been reviewed.", ephemeral=True
+            )
+            return
+
         success = await update_roles(interaction, self.selected_pr)
 
         if not success:
-            return
-
-        user = client.get_user(self.selected_pr.user_id)
-        if user is None:
-            log_error(f"Could not find user with id {self.selected_pr.user_id}")
-            await send_client_error(
-                "we couldn't find the user that made this PR", interaction
-            )
+            try:
+                unapprove_pr(self.selected_pr.pr_id)
+            except sqlite3.Error as e:
+                log_error("Failed to revert PR approval", e)
             return
 
         logger.info(
@@ -352,8 +407,16 @@ class PRQueueView(View):
             )
             return
 
+        user = client.get_user(self.selected_pr.user_id)
+        if user is None:
+            log_error(f"Could not find user with id {self.selected_pr.user_id}")
+            await send_client_error(
+                "we couldn't find the user that made this PR", interaction
+            )
+            return
+
         try:
-            remove_pr(self.selected_pr.pr_id)
+            removed = remove_pr(self.selected_pr.pr_id)
         except sqlite3.Error as e:
             log_error("Failed to remove PR", e)
             await send_client_error(
@@ -361,11 +424,9 @@ class PRQueueView(View):
             )
             return
 
-        user = client.get_user(self.selected_pr.user_id)
-        if user is None:
-            log_error(f"Could not find user with id {self.selected_pr.user_id}")
-            await send_client_error(
-                "we couldn't find the user that made this PR", interaction
+        if not removed:
+            await interaction.response.send_message(
+                "This PR has already been reviewed.", ephemeral=True
             )
             return
 
